@@ -3,16 +3,41 @@ package main
 import (
 	"net/http"
 	"log"
+	"github.com/kingsglaive/handlers"
+	"os"
+	"time"
+	// "os/signal"
+	"context"
 )
 
+func main(){	
+	l := log.New(os.Stdout,"product-api",log.LstdFlags)
+	hh := handlers.NewHello(l)
+	gh := handlers.NewGoodbye(l)
 
-func main(){
-	http.HandleFunc("/",func(http.ResponseWriter,*http.Request){
-		log.Println("Hello World")
-	})
-	http.HandleFunc("/goodbye",func(http.ResponseWriter,*http.Request){
-		log.Println("Goodbye World")
-	})
-	http.ListenAndServe(":9090",nil);
 
+	sm := http.NewServeMux()
+	sm.Handle("/",hh)
+	sm.Handle("/goodbye",gh)
+
+	s := &http.Server{
+		Addr:":9090",
+		Handler:sm,
+		IdleTimeout: 120 * time.Second,
+		ReadTimeout: 1 * time.Second,
+		WriteTimeout:  1 * time.Second,
+	}
+	go func() {
+		err := s.ListenAndServe()
+		if err != nil{
+			l.Fatal(err)
+		}
+	}()
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan,os.Interrupt)
+	signal.Notify(sigChan,os.Kill)
+	sig := <- sigChan
+	l.Println("Recieved terminate , graceful shutdown",sig)
+	tc,_ := context.WithTimeout(context.Background(),20*time.Second)
+	s.Shutdown(tc)
 }
